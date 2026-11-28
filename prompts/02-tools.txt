@@ -1,0 +1,40 @@
+Build stage 2: tested Python tools for the database created in stage 1. Do not add an LLM
+yet.
+
+Use Python 3.12 and the Supabase client, with SUPABASE_URL and SUPABASE_KEY loaded from
+environment variables or Colab Secrets. Runtime writes call the narrow validated database
+RPCs. Never print credentials. Model-facing tools must not accept a client key, SQL,
+budget overrides, or quantity-cap overrides.
+
+Implement InventoryService with list_inventory, get_sales_history, get_supplier_options,
+get_supplier_messages, estimate_demand, calculate_eoq, reorder_point, predict_stockout,
+order_total_cost, plan_orders, create_purchase_order, send_purchase_order and
+log_decision. Add reset_scenario and receive_due as notebook utilities only, excluded from
+the model tool list. Wrap model tools with typed LangChain StructuredTool schemas and
+useful descriptions.
+
+All arithmetic is deterministic. Average the previous 90 calendar days including
+missing/zero days; annualize by 365. Only annotated in-window sales IDs for that SKU may
+be excluded. Excluding the daily aggregate removes its ordinary sales too; keep the
+denominator at 90 and document this simplification. EOQ=sqrt(2*D*S/H); H=applicable
+price*holding rate. Evaluate rounded EOQ and all-unit discount candidates, free-shipping
+thresholds and supplier minimums. MOQ and pack size constrain feasible quantities. Use
+Decimal and two-place displayed money, not float arithmetic. Zero demand returns zero EOQ
+and no stockout.
+
+Reorder point=daily demand*lead days+safety stock; inventory position=on_hand+on_order.
+Project stockout over 366 days, applying sent-order receipts at the start of due dates.
+Report inevitable delivery gaps rather than implying they are solved.
+
+Calculate delivered basket costs with one ordering fee and one shipping fee per supplier
+order. Use an explainable urgency-first heuristic for deadline/budget planning: rank
+stockouts, evaluate supplier choices with evidence-based lead overrides, group selected
+lines by supplier, and shrink quantities by packs if budget requires. Do not claim a
+global optimum. Overrides affect analysis, not supplier master data.
+
+Write unit tests for EOQ D=1000,S=10,H=2 yielding 100; rounding, price breaks, zero
+demand, annotated exclusions, consolidation $750 versus $620, invalid quantities,
+cumulative caps, scheduled receipts, disruption supplier switching and budget feasibility.
+Add PostgreSQL integration tests for RPC behavior, rollback, idempotency and concurrent
+budget enforcement. Use an explicitly configured empty TEST_DATABASE_URL for integration
+tests, never an implicit instructor project. Report tested results and limitations.
