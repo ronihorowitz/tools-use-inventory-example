@@ -189,6 +189,45 @@ def test_concurrent_orders_cannot_overspend(db):
     assert total <= 20000
 
 
+def test_conversation_survives_reconnection_without_model_costs(db, service):
+    """A scripted model and the real PostgresSaver: close the connection, reopen it, the thread is still there."""
+    from langchain_core.messages import AIMessage
+    from inventory_agent import new_thread_id, open_agent, run_turn
+
+    class Scripted:
+        def __init__(self, *replies):
+            self.replies = list(replies)
+
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+        def invoke(self, messages):
+            return self.replies.pop(0)
+
+    service.reset_scenario('disruption')
+    thread = new_thread_id('disruption')
+    config = {'configurable': {'thread_id': thread}}
+    model = Scripted(AIMessage(content='', tool_calls=[{'name': 'list_inventory', 'args': {}, 'id': 'c1'}]),
+                     AIMessage(content='Inventory read.'), AIMessage(content='Still here.'))
+    with open_agent(service, model=model, db_uri=URL) as graph:
+        run_turn(graph, thread, 'Read the inventory only.', emit=lambda _: None)
+    with open_agent(service, model=model, db_uri=URL) as graph:          # a new connection
+        assert len(graph.get_state(config).values['messages']) == 4
+        run_turn(graph, thread, 'Are you still there?', emit=lambda _: None)
+        assert len(graph.get_state(config).values['messages']) == 6
+
+
+def test_checkpoint_version_mismatch_is_refused(db, service):
+    db.execute('delete from inventory_checkpoints.checkpoint_migrations where v = 9')
+    try:
+        from inventory_agent import open_agent
+        with pytest.raises(RuntimeError, match='Checkpoint schema is at version 8'):
+            with open_agent(service, model=object(), db_uri=URL):
+                pass
+    finally:
+        db.execute('insert into inventory_checkpoints.checkpoint_migrations (v) values (9)')
+
+
 def test_anon_and_authenticated_cannot_call_the_functions(db):
     for role in ('anon', 'authenticated'):
         with connect() as conn, conn.transaction():

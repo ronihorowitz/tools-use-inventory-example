@@ -4,8 +4,6 @@ Python does the arithmetic (Decimal, never float); PostgreSQL validates every wr
 Reads use one consistent inventory_snapshot() per call. Writes call the narrow RPCs.
 Model-facing tools never accept SQL, a client key, a budget, a quantity cap or a request key.
 """
-from __future__ import annotations
-
 from datetime import date, timedelta
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 import json
