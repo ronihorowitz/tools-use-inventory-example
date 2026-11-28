@@ -44,7 +44,7 @@ Drafts reserve budget and caps immediately; sent, unreceived lines count as on o
 
 ### Checks
 
-`tests/database_assertions.sql` runs 54 checks inside one transaction that rolls back:
+`tests/database_assertions.sql` runs 56 checks inside one transaction that rolls back:
 - fixture counts;
 - the prompt's cost examples ($750 vs $620, $11,430 + $8,580 over budget);
 - every rejection rule, including 10,000 units and 2 × 700 against the paper cap;

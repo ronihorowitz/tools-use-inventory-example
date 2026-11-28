@@ -128,6 +128,11 @@ select pg_temp.expect_error($q$ select public.inventory_reset_scenario('everythi
 -- 10. Access: RLS everywhere; only service_role can use the schema and functions
 select pg_temp.check((select bool_and(rowsecurity) and count(*) = 15 from pg_tables
                       where schemaname in ('inventory', 'inventory_checkpoints')), 'RLS on all 15 tables');
+-- The RPCs rely on this Supabase default: with RLS on and no policies, only a role that bypasses
+-- RLS can see rows. (A plain service_role without it reads empty tables.)
+select pg_temp.check((select rolbypassrls from pg_roles where rolname = 'service_role'), 'service_role bypasses RLS');
+select pg_temp.check(not (select bool_or(rolbypassrls) from pg_roles where rolname in ('anon', 'authenticated')),
+                     'anon and authenticated do not bypass RLS');
 select pg_temp.check(not has_schema_privilege(r, 'inventory', 'USAGE'), r || ' has no usage on inventory')
   from unnest(array['anon', 'authenticated']) r;
 select pg_temp.check(not has_schema_privilege(r, 'inventory_checkpoints', 'USAGE'), r || ' has no usage on inventory_checkpoints')

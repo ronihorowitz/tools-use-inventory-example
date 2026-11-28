@@ -64,9 +64,12 @@ def db():
     with connect() as conn:
         if conn.execute("select 1 from pg_namespace where nspname = 'inventory'").fetchone():
             pytest.fail('TEST_DATABASE_URL already has an inventory schema; use an EMPTY disposable database')
-        for role in ('anon', 'authenticated', 'service_role'):   # the roles Supabase provides
+        # The roles Supabase provides, with Supabase's attributes: service_role bypasses RLS
+        # (the tables have RLS on and no policies), anon and authenticated do not.
+        for role, attributes in (('anon', 'nologin'), ('authenticated', 'nologin'), ('service_role', 'nologin bypassrls')):
             conn.execute(f"do $$ begin if not exists (select from pg_roles where rolname = '{role}') "
-                         f"then create role {role} nologin; end if; end $$")
+                         f"then create role {role} {attributes}; end if; end $$")
+            conn.execute(f'alter role {role} {attributes}')
         for migration in MIGRATIONS:
             conn.execute(migration.read_text(encoding='utf-8'))
         yield conn
